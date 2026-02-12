@@ -4,6 +4,40 @@
 
 A GitHub Copilot [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) that reviews Azure DevOps PRs from inside VS Code. Posts inline comments with individual approval, enforces your team's coding standards.
 
+```mermaid
+flowchart LR
+    Engineer(("Engineer")) -->|"PR # or link"| Review["PR Review<br>Agent"]
+
+    subgraph Context["Gather Context"]
+        ADO["Azure DevOps<br>(PR, work items)"]
+        Git["Git Remote<br>(diffs, files)"]
+        Standards["Instruction<br>Files"]
+    end
+
+    Review --> Context
+    Review -->|"Numbered<br>findings"| Approve{"Post this<br>comment?"}
+    Approve -->|"Yes"| Post["Post to<br>Azure DevOps"]
+    Approve -->|"No"| Next["Next finding"]
+    Approve -->|"Edit"| Revise["Revise text"] --> Approve
+
+    Review -.->|"Address Findings<br>(optional handoff)"| Fix["PR Fix<br>Agent"]
+    Fix -->|"Checks out branch<br>edits files locally"| Engineer
+
+    classDef agent fill:#1a73e8,color:#fff,stroke:#1557b0
+    classDef fix fill:#e8710a,color:#fff,stroke:#c45d08
+    classDef external fill:#0078d4,color:#fff,stroke:#005a9e
+    classDef decision fill:#28a745,color:#fff,stroke:#1e7e34
+    classDef person fill:#6f42c1,color:#fff,stroke:#5a32a3
+    classDef step fill:#495057,color:#fff,stroke:#343a40
+
+    class Review agent
+    class Fix fix
+    class ADO,Git,Standards,Post external
+    class Approve decision
+    class Engineer person
+    class Next,Revise step
+```
+
 ## Prerequisites
 
 - [VS Code 1.106+](https://code.visualstudio.com/download) with [GitHub Copilot](https://docs.github.com/en/copilot) (free tier works). Custom agents were [introduced in VS Code 1.106](https://code.visualstudio.com/updates/v1_106).
