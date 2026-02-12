@@ -126,7 +126,7 @@ Substitute ONLY these placeholders:
 - `{defaultBranch}` with the default branch input
 - `{PHASE_4_CATEGORIES}` with category examples generated from Step 1 analysis (see instructions below)
 
-All other curly-brace expressions (`{prId}`, `{id}`, `{title}`, `{author}`, `{sourceBranch}`, `{targetBranch}`, `{filePath}`, `{startLine}`, `{endLine}`, `{count}`, `{insertions}`, `{deletions}`, `{n}`, `{total}`, `{postedCount}`, `{skippedCount}`, `{replyCount}`) are runtime template variables used by the agent during PR reviews. Leave them exactly as-is.
+All other curly-brace expressions (`{prId}`, `{id}`, `{title}`, `{author}`, `{sourceBranch}`, `{targetBranch}`, `{filePath}`, `{startLine}`, `{endLine}`, `{count}`, `{insertions}`, `{deletions}`, `{n}`, `{total}`, `{postedCount}`, `{skippedCount}`, `{replyCount}`, `{repositoryId}`) are runtime template variables used by the agent during PR reviews. Leave them exactly as-is.
 
 ### Phase 4 Categories
 
@@ -147,7 +147,7 @@ Create `.github/agents/pr-review.agent.md` with this content:
 ---
 description: Review an Azure DevOps PR against {defaultBranch}. Provide a PR number or link.
 name: PR Review
-tools: ['execute', 'read', 'search', 'ado/*']
+tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
 ---
 
 # PR Review Agent
@@ -193,12 +193,14 @@ The user can provide a PR in two ways:
 
 If no PR number or link was provided: respond with "Please provide a PR number or link to review." and STOP. Do absolutely nothing else.
 
-1. Use `mcp_ado_repo_get_pull_request_by_id` with the PR ID and `includeWorkItemRefs: true` to get full details (title, description, source branch, target branch, author, reviewers, linked work items).
-2. Verify the PR exists and is active. If it is not active, tell the user and stop.
-3. Display a brief summary:
+1. Resolve the repository GUID. Call `mcp_ado_repo_get_repo_by_name_or_id` with `project` set to `{adoProject}` and `repositoryNameOrId` set to `{repoName}`. Extract the `id` field from the response (a GUID like `66b324f4-7f73-471d-ba80-fdee3a1f9c1b`). Store this as `{repositoryId}` for ALL subsequent MCP calls in this review. **Never pass the repository name as `repositoryId` - always use the GUID.**
+2. Use `mcp_ado_repo_get_pull_request_by_id` with `repositoryId` set to the GUID from step 1, `pullRequestId` set to the PR ID, and `includeWorkItemRefs: true` to get full details (title, description, source branch, target branch, author, reviewers, linked work items).
+3. Verify the PR exists and is active. If it is not active, tell the user and stop.
+4. If linked work item IDs were returned in step 2, fetch their details using `mcp_ado_wit_get_work_items_batch_by_ids` with `project` set to `{adoProject}` and `ids` set to the list of work item IDs. Extract the title, description, and acceptance criteria from each work item. You will use this context in Phase 4 to evaluate whether the code changes deliver on the stated intent.
+5. Display a brief summary:
    - PR #{id} - {title} by {author}
    - Source: {sourceBranch} -> Target: {targetBranch}
-   - Linked work items: list any linked work item IDs, or "None" if there are none
+   - Linked work items: list each work item as "#{id} - {title}", or "None" if there are none
    - Link: https://{adoBaseUrl}/{adoProject}/_git/{repoName}/pullrequest/{id}
 
 ### Phase 2: Get the Diff
@@ -267,8 +269,8 @@ If there are no critical issues or suggestions, say so clearly - not every PR ha
 
 First, prepare for posting:
 
-1. Use `mcp_ado_repo_list_pull_request_threads` to get all existing comment threads on the PR.
-2. For each existing thread, use `mcp_ado_repo_list_pull_request_thread_comments` to read the comment content. Identify threads that were posted by a previous review run (they will contain review findings with file/line references or summary assessments).
+1. Use `mcp_ado_repo_list_pull_request_threads` with `repositoryId` set to the GUID from Phase 1 step 1, `pullRequestId` set to the PR ID, and `project` set to `{adoProject}` to get all existing comment threads on the PR.
+2. For each existing thread, use `mcp_ado_repo_list_pull_request_thread_comments` with `repositoryId` (GUID), `pullRequestId`, `threadId`, and `project` set to `{adoProject}` to read the comment content. Identify threads that were posted by a previous review run (they will contain review findings with file/line references or summary assessments).
 
 Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time, in order:
 
@@ -287,15 +289,16 @@ Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time
    - **Edit**: The user will provide revised text. Show the updated comment and ask again. Repeat until they confirm with "Yes" or skip with "No".
 
 3. To post an approved comment:
-   - If an existing thread already covers the **same file and line range**, use `mcp_ado_repo_reply_to_comment` to reply to that thread instead of creating a duplicate.
+   - If an existing thread already covers the **same file and line range**, use `mcp_ado_repo_reply_to_comment` with `repositoryId` (GUID), `pullRequestId`, `threadId` (from the matching thread), `content` (the approved text), and `project` set to `{adoProject}` to reply to that thread instead of creating a duplicate.
    - Otherwise, use `mcp_ado_repo_create_pull_request_thread` with:
-     - `repositoryId`: The repository ID from Phase 1
+     - `repositoryId`: The repository GUID resolved in Phase 1 step 1 (never the repository name)
      - `pullRequestId`: The PR ID
      - `content`: The exact approved comment text. Do not rephrase or summarize.
      - `filePath`: The relative file path (e.g., `/src/components/MyComponent.tsx`)
      - `rightFileStartLine`: The starting line number
      - `rightFileEndLine`: The ending line number
      - `status`: `active`
+     - `project`: `{adoProject}`
    - After posting, confirm to the user: "Posted. ({n} of {total})"
 
 4. After all inline comments have been presented, show the summary comment:
@@ -388,7 +391,7 @@ Create the prompt file that provides a `/prReview` slash command. Use this exact
 description: Quick-launch a PR review. Provide a PR number or link.
 name: prReview
 agent: PR Review
-tools: ['execute', 'read', 'search', 'ado/*']
+tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
 ---
 
 Review PR ${input:pr:Enter the PR number or paste the PR link} against {defaultBranch} in Azure DevOps.
@@ -489,7 +492,10 @@ After generating all files, display a summary:
    - `.github/instructions/code-review.instructions.md` - the AI's best interpretation of the team's coding standards based on codebase analysis. The user should read it, edit anything that does not match their expectations, and add rules the AI may have missed.
    - `.github/copilot-instructions.md` (if newly created) - the AI's best guess at workspace-wide guidance for all AI agents. Review each section, correct inaccuracies, and add project context the AI may not have discovered.
 3. Remind the user that the agent's Phase 4 review categories (in the agent file) should also be reviewed to make sure they fit the team's priorities.
-4. Note that the team needs Node.js 20+ installed for the Azure DevOps MCP server to work (it runs via npx).
-5. Remind the user to start the ADO MCP server if they have not already (open `.vscode/mcp.json` and click **Start**, or run **MCP: List Servers** from the Command Palette). The server must be running before the PR Review agent can call any ADO tools.
+4. List the prerequisites the team needs installed: **VS Code 1.106+** (custom agents require it), **Git** (the agent runs git commands for all diff and context-gathering operations), and **Node.js 20+** (the Azure DevOps MCP server runs via npx). Link to the install pages: [VS Code](https://code.visualstudio.com/download), [Git](https://git-scm.com/downloads), [Node.js](https://nodejs.org/en/download).
+5. Remind the user to start the ADO MCP server and reload VS Code:
+   - **Start the server**: Open `.vscode/mcp.json` and click **Start** on the code lens above the `ado` server entry. Accept the trust prompt on first launch. Alternatively, run **MCP: List Servers** from the Command Palette and start `ado` from there.
+   - **Reload the window**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS), select **Developer: Reload Window**. This clears stale MCP configuration cache and ensures VS Code detects the server.
+   - If the server still does not work, see the [Azure DevOps MCP Server Troubleshooting](https://github.com/microsoft/azure-devops-mcp/blob/main/docs/TROUBLESHOOTING.md) guide and VS Code's [MCP Server Troubleshooting](https://code.visualstudio.com/docs/copilot/customization/mcp-servers#_troubleshoot-and-debug-mcp-servers) docs.
 6. Tell the user to commit, push, and start using the agent: switch to "PR Review" in the GitHub Copilot chat dropdown and provide a PR number.
 7. Ask if any sections in the generated files feel incomplete or inaccurate, and offer to iterate on them.

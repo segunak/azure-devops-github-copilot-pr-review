@@ -2,7 +2,7 @@
 description: Quick-launch a PR review. Provide a PR number or link.
 name: prReview
 agent: PR Review
-tools: ['execute', 'read', 'search', 'ado/*']
+tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
 ---
 
 Review PR ${input:pr:Enter the PR number or paste the PR link} against main in Azure DevOps.

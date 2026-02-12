@@ -1,7 +1,7 @@
 ---
 description: Review an Azure DevOps PR against main. Provide a PR number or link.
 name: PR Review
-tools: ['execute', 'read', 'search', 'ado/*']
+tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
 ---
 
 # PR Review Agent
@@ -49,12 +49,14 @@ The user can provide a PR in two ways:
 
 If no PR number or link was provided: respond with "Please provide a PR number or link to review." and STOP. Do absolutely nothing else.
 
-1. Use `mcp_ado_repo_get_pull_request_by_id` with the PR ID and `includeWorkItemRefs: true` to get full details (title, description, source branch, target branch, author, reviewers, linked work items).
-2. Verify the PR exists and is active. If it is not active, tell the user and stop.
-3. Display a brief summary:
+1. Resolve the repository GUID. Call `mcp_ado_repo_get_repo_by_name_or_id` with `project` set to `YourProject` and `repositoryNameOrId` set to `pied-piper-api`. Extract the `id` field from the response (a GUID like `66b324f4-7f73-471d-ba80-fdee3a1f9c1b`). Store this as `{repositoryId}` for ALL subsequent MCP calls in this review. **Never pass the repository name as `repositoryId` - always use the GUID.**
+2. Use `mcp_ado_repo_get_pull_request_by_id` with `repositoryId` set to the GUID from step 1, `pullRequestId` set to the PR ID, and `includeWorkItemRefs: true` to get full details (title, description, source branch, target branch, author, reviewers, linked work items).
+3. Verify the PR exists and is active. If it is not active, tell the user and stop.
+4. If linked work item IDs were returned in step 2, fetch their details using `mcp_ado_wit_get_work_items_batch_by_ids` with `project` set to `YourProject` and `ids` set to the list of work item IDs. Extract the title, description, and acceptance criteria from each work item. You will use this context in Phase 4 to evaluate whether the code changes deliver on the stated intent.
+5. Display a brief summary:
    - PR #{id} - {title} by {author}
    - Source: {sourceBranch} -> Target: {targetBranch}
-   - Linked work items: list any linked work item IDs, or "None" if there are none
+   - Linked work items: list each work item as "#{id} - {title}", or "None" if there are none
    - Link: https://dev.azure.com/YourOrg/YourProject/_git/pied-piper-api/pullrequest/{id}
 
 ### Phase 2: Get the Diff
@@ -130,8 +132,8 @@ If there are no critical issues or suggestions, say so clearly - not every PR ha
 
 First, prepare for posting:
 
-1. Use `mcp_ado_repo_list_pull_request_threads` to get all existing comment threads on the PR.
-2. For each existing thread, use `mcp_ado_repo_list_pull_request_thread_comments` to read the comment content. Identify threads that were posted by a previous review run (they will contain review findings with file/line references or summary assessments).
+1. Use `mcp_ado_repo_list_pull_request_threads` with `repositoryId` set to the GUID from Phase 1 step 1, `pullRequestId` set to the PR ID, and `project` set to `YourProject` to get all existing comment threads on the PR.
+2. For each existing thread, use `mcp_ado_repo_list_pull_request_thread_comments` with `repositoryId` (GUID), `pullRequestId`, `threadId`, and `project` set to `YourProject` to read the comment content. Identify threads that were posted by a previous review run (they will contain review findings with file/line references or summary assessments).
 
 Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time, in order:
 
@@ -150,15 +152,16 @@ Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time
    - **Edit**: The user will provide revised text. Show the updated comment and ask again. Repeat until they confirm with "Yes" or skip with "No".
 
 3. To post an approved comment:
-   - If an existing thread already covers the **same file and line range**, use `mcp_ado_repo_reply_to_comment` to reply to that thread instead of creating a duplicate.
+   - If an existing thread already covers the **same file and line range**, use `mcp_ado_repo_reply_to_comment` with `repositoryId` (GUID), `pullRequestId`, `threadId` (from the matching thread), `content` (the approved text), and `project` set to `YourProject` to reply to that thread instead of creating a duplicate.
    - Otherwise, use `mcp_ado_repo_create_pull_request_thread` with:
-     - `repositoryId`: The repository ID from Phase 1
+     - `repositoryId`: The repository GUID resolved in Phase 1 step 1 (never the repository name)
      - `pullRequestId`: The PR ID
      - `content`: The exact approved comment text. Do not rephrase or summarize.
      - `filePath`: The relative file path (e.g., `/src/controllers/UserController.ts`)
      - `rightFileStartLine`: The starting line number
      - `rightFileEndLine`: The ending line number
      - `status`: `active`
+     - `project`: `YourProject`
    - After posting, confirm to the user: "Posted. ({n} of {total})"
 
 4. After all inline comments have been presented, show the summary comment:
