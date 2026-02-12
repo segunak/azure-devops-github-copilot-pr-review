@@ -1,6 +1,6 @@
 # GitHub Copilot PR Review Agent for Azure DevOps
 
-> **This project is a workaround.** GitHub Copilot already has a built-in [Code Review agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) that reviews pull requests automatically, but it only works with GitHub-hosted repositories. Microsoft will likely extend that capability to Azure DevOps Git repos at some point. Until they do, this project fills the gap. **If your repo is on GitHub, skip all of this and use the built-in Code Review agent instead.**
+> **This project is a workaround.** GitHub Copilot already has a built-in [Code Review Agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) that reviews pull requests automatically, but it only works with GitHub-hosted repositories. Microsoft will likely extend that capability to Azure DevOps Git repos at some point. Until they do, this project fills the gap. **If your repo is on GitHub, skip all of this and use the built-in Code Review Agent instead.**
 
 A GitHub Copilot [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) that reviews Azure DevOps PRs from inside VS Code. Posts inline comments with individual approval, enforces your team's coding standards.
 
@@ -92,7 +92,7 @@ A [prompt file](https://code.visualstudio.com/docs/copilot/customization/prompt-
 
 Configures the [Azure DevOps MCP Server](https://github.com/microsoft/azure-devops-mcp) via the [Model Context Protocol](https://modelcontextprotocol.io/), giving the agent access to ADO tools for fetching PR details, reading threads, and posting inline comments.
 
-### Global Copilot Instructions (`.github/copilot-instructions.md`)
+### Global GitHub Copilot Instructions (`.github/copilot-instructions.md`)
 
 The workspace-level [copilot-instructions.md](https://code.visualstudio.com/docs/copilot/customization/instructions) gives GitHub Copilot general context about the repo, the ADO integration, and the PR Review Agent.
 
@@ -143,27 +143,19 @@ The scaffolding prompt does not set a model by default, so it uses whatever mode
 - **Not a replacement for human review.** Assists reviewers, does not replace them. The engineer makes the final call.
 - **VS Code only.** Custom agents are a VS Code feature. Does not work in Visual Studio, JetBrains, or other editors.
 
-## Alternatives and Prior Art
+## Alternatives
 
 ### GitHub Copilot Code Review (GitHub Only)
 
-GitHub's [built-in Code Review agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) is excellent but only works with GitHub-hosted repos. This project fills that gap for Azure DevOps.
+GitHub's [built-in Code Review Agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) is excellent but only works with GitHub-hosted repos. This project fills that gap for Azure DevOps.
 
 ### Pipeline-Based Automation
 
-Extensions like [ado-copilot-code-review](https://github.com/little-fort/ado-copilot-code-review) run as pipeline tasks using the Copilot CLI. Trade-offs: require a PAT, post only general comments (not inline), no human-in-the-loop, no codebase context awareness.
-
-### GitHub Copilot SDK
-
-The [GitHub Copilot SDK](https://github.com/github/copilot-sdk) (Technical Preview) lets you build fully automated server-side agents. Significant engineering effort (weeks, not hours) and the ADO auth story is still evolving.
+Extensions like [ado-copilot-code-review](https://github.com/little-fort/ado-copilot-code-review) run as pipeline tasks using the GitHub Copilot CLI. Trade-offs: require a PAT, post only general comments (not inline), no human-in-the-loop, no codebase context awareness.
 
 ### Community Discussion
 
-There is an [active community discussion](https://github.com/orgs/community/discussions/151205) (280+ upvotes) requesting native Copilot support for Azure DevOps PR reviews.
-
-### Why This Approach
-
-Optimizes for time-to-value. One prompt file, five minutes of setup, no infrastructure. The trade-off is that it runs locally - someone has to invoke the agent. For teams that want a reviewer assistant rather than a reviewer replacement, that is the right trade-off.
+There is a [community discussion](https://github.com/orgs/community/discussions/151205) requesting native GitHub Copilot support for Azure DevOps PR reviews.
 
 ## Repository Structure
 
@@ -181,7 +173,3 @@ example/                            # Complete working reference (Node.js/TypeSc
 LICENSE                             # MIT
 README.md                          # This file
 ```
-
-## License
-
-[MIT](LICENSE)
