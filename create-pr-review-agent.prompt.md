@@ -27,6 +27,7 @@ Run `git remote get-url origin` to get the remote URL and parse the Azure DevOps
 
 - `https://dev.azure.com/{org}/{project}/_git/{repoName}` - base URL is `dev.azure.com/{org}`
 - `https://{org}.visualstudio.com/{project}/_git/{repoName}` - base URL is `{org}.visualstudio.com`
+- `https://{org}.visualstudio.com/DefaultCollection/{project}/_git/{repoName}` - same as above, ignore `DefaultCollection` (it is a legacy Team Foundation Server (TFS) path segment, not part of the org or project)
 - `git@ssh.dev.azure.com:v3/{org}/{project}/{repoName}` - base URL is `dev.azure.com/{org}`
 
 Extract all four values from the URL: organization (`{adoOrg}`), project (`{adoProject}`), repository name (`{repoName}`), and base URL (`{adoBaseUrl}`).
