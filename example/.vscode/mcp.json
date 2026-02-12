@@ -1,0 +1,10 @@
+{
+  "servers": {
+    // Azure DevOps MCP Server. Docs: https://github.com/microsoft/azure-devops-mcp
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "YourOrg", "-d", "core", "repositories"]
+    }
+  }
+}
