@@ -319,16 +319,6 @@ Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time
      - `project`: `{adoProject}`
    - After posting, confirm to the user: "Posted. ({n} of {total})"
 
-4. After all inline comments have been presented, show the summary comment:
-
-   > **Summary Comment** (general, no file path)
-   > **Comment text**:
-   > {The overall assessment text from Phase 5, including counts}
-   >
-   > Post this summary comment? (**Yes** / **No** / **Edit**)
-
-   Follow the same Yes/No/Edit flow. If a previous summary thread exists, reply to it instead of creating a new one.
-
 Do not skip ahead. Do not combine multiple comments into one prompt. Do not post anything the user has not explicitly approved. The user must read and approve every single comment individually.
 
 ### Phase 7: Post-Review Summary
