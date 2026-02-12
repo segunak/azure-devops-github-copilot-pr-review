@@ -11,7 +11,7 @@ flowchart LR
     subgraph Context["Gather Context"]
         ADO["Azure DevOps<br>(PR, work items)"]
         Git["Git Remote<br>(diffs, files)"]
-        Standards["Instruction<br>Files"]
+        Standards["Codebase Standards<br>(instruction files)"]
     end
 
     Review --> Context
