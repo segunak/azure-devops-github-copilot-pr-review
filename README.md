@@ -17,7 +17,7 @@ There is a [prompt file](https://code.visualstudio.com/docs/copilot/customizatio
 
 1. Download [`create-pr-review-agent.prompt.md`](create-pr-review-agent.prompt.md) and place it in your repo at `.github/prompts/create-pr-review-agent.prompt.md`. The file name and path must be exact.
 2. Open VS Code, open GitHub Copilot chat, type `/createPrReviewAgent`.
-3. Fill in your ADO organization, project, base URL, and default branch. Confirm the auto-detected repo name.
+3. Confirm the auto-detected ADO organization, project, repository name, and base URL (or provide corrections). Enter your default branch.
 4. Review the generated files, especially `.github/instructions/code-review.instructions.md` (the AI's best guess at your team's standards - edit as needed).
 5. Commit and push. Then follow the [**Starting the MCP Server**](#starting-the-mcp-server) steps below before using the agent.
 

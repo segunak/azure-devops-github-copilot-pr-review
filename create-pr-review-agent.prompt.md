@@ -13,39 +13,45 @@ This prompt analyzes the codebase to understand the tech stack, coding conventio
 
 ## Inputs
 
-### Azure DevOps Connection
-
-- **ADO Organization**: ${input:adoOrg:Your Azure DevOps organization name (e.g., PiedPiper)}
-- **ADO Project**: ${input:adoProject:Your Azure DevOps project name (e.g., MyProject)}
-- **ADO Base URL**: ${input:adoBaseUrl:Your ADO base URL without https:// (e.g., dev.azure.com/PiedPiper or piedpiper.visualstudio.com)}
-
-### Branch Configuration
-
 - **Default Branch**: ${input:defaultBranch:The branch PRs are raised against (e.g., main, develop, master)}
+
+The ADO organization, project, repository name, and base URL are auto-detected from the git remote in Step 1.
 
 ## Step 1: Analyze the Codebase
 
 Before generating anything, research the workspace so you can write informed review standards, generate accurate categories, and produce comprehensive workspace instructions.
 
-### Detect Repository Name
+### Detect Azure DevOps Connection
 
-Run `git remote get-url origin` to get the remote URL and parse the repository name from it. Azure DevOps remote URLs follow these patterns:
+Run `git remote get-url origin` to get the remote URL and parse the Azure DevOps connection details from it. Azure DevOps remote URLs follow these patterns:
 
-- `https://dev.azure.com/{org}/{project}/_git/{repoName}` - extract the last path segment as `{repoName}`
-- `https://{org}.visualstudio.com/{project}/_git/{repoName}` - extract the last path segment as `{repoName}`
-- `git@ssh.dev.azure.com:v3/{org}/{project}/{repoName}` - extract the last path segment as `{repoName}`
+- `https://dev.azure.com/{org}/{project}/_git/{repoName}` - base URL is `dev.azure.com/{org}`
+- `https://{org}.visualstudio.com/{project}/_git/{repoName}` - base URL is `{org}.visualstudio.com`
+- `git@ssh.dev.azure.com:v3/{org}/{project}/{repoName}` - base URL is `dev.azure.com/{org}`
 
-**You MUST confirm the detected name with the user before proceeding.** Show them what you found and ask:
+Extract all four values from the URL: organization (`{adoOrg}`), project (`{adoProject}`), repository name (`{repoName}`), and base URL (`{adoBaseUrl}`).
 
-> I detected the repository name as **{repoName}** from the git remote. Is that correct? (yes / provide a different name)
+**You MUST confirm the detected values with the user before proceeding.** Show them what you found and ask:
 
-Wait for the user to confirm or provide a corrected name. Do not proceed until you have a confirmed repository name.
+> I detected the following from the git remote:
+> - **Organization**: {adoOrg}
+> - **Project**: {adoProject}
+> - **Repository**: {repoName}
+> - **Base URL**: {adoBaseUrl}
+>
+> Are these correct? (yes / provide corrections)
 
-If no git remote is configured or the URL does not match any known pattern, ask the user directly:
+Wait for the user to confirm or provide corrections. Do not proceed until all four values are confirmed.
 
-> I could not detect the repository name from the git remote. What is the repository name in Azure DevOps?
+If no git remote is configured or the URL does not match any known Azure DevOps pattern, ask the user directly:
 
-Store the confirmed value as `{repoName}` and use it in all subsequent steps wherever `{repoName}` appears.
+> I could not detect the Azure DevOps connection from the git remote. Please provide the following:
+> - **ADO Organization** (e.g., PiedPiper)
+> - **ADO Project** (e.g., MyProject)
+> - **Repository Name** (e.g., pied-piper-api)
+> - **ADO Base URL** (e.g., dev.azure.com/PiedPiper or piedpiper.visualstudio.com)
+
+Store the confirmed values as `{adoOrg}`, `{adoProject}`, `{repoName}`, and `{adoBaseUrl}` and use them in all subsequent steps.
 
 ### Discover Existing AI Conventions
 
@@ -92,7 +98,7 @@ Apply these formatting rules in every file you generate (Steps 2 through 7):
 
 If `.vscode/mcp.json` already exists, read it and add the `ado` server entry to the existing `servers` object. Do not remove or overwrite existing servers.
 
-If it does not exist, create it with this exact content, substituting the ADO organization name from the input:
+If it does not exist, create it with this exact content, substituting the ADO organization name detected in Step 1:
 
 ```jsonc
 {
