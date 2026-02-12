@@ -2,6 +2,11 @@
 description: Review an Azure DevOps PR against main. Provide a PR number or link.
 name: PR Review
 tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
+handoffs:
+  - label: Address Findings
+    agent: PR Fix
+    prompt: Implement the fixes for the numbered findings from the PR review above. The source branch is in the review summary. Parse all findings, check out the branch, and implement the fixes one at a time.
+    send: true
 ---
 
 # PR Review Agent
@@ -113,11 +118,17 @@ Present findings in chat as a structured report. Categorize everything by signal
 **Files Changed**: {count} files ({insertions} additions, {deletions} deletions)
 **Linked Work Items**: List any linked work item IDs from Phase 1, or "None"
 
+Number every finding sequentially across all sections. The numbering must be continuous and never reset between Critical Issues and Suggestions. Good Practices are not numbered.
+
 **Critical Issues** - Must fix before merge. These are bugs, security holes, data loss risks, or violations of hard architectural rules:
-- [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
+- **Finding 1** [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
+- **Finding 2** [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
 
 **Suggestions** - Genuinely worthwhile improvements to design, patterns, reliability, or maintainability:
-- [{filePath}:{line}] Description. Suggested improvement.
+- **Finding 3** [{filePath}:{line}] Description. Suggested improvement.
+- **Finding 4** [{filePath}:{line}] Description. Suggested improvement.
+
+(The numbers above are examples. Use the actual count of findings. If there are 2 Critical Issues and 3 Suggestions, number them Finding 1-2 under Critical Issues and Finding 3-5 under Suggestions.)
 
 **Good Practices** - What is done well:
 - Brief notes on what the PR does right.
@@ -139,7 +150,7 @@ Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time
 
 1. Show the user exactly what you are about to post:
 
-   > **Comment {n} of {total}** - {Critical Issue | Suggestion}
+   > **Finding {findingNumber}** ({n} of {total}) - {Critical Issue | Suggestion}
    > **File**: {filePath} (lines {startLine}-{endLine})
    > **Comment text**:
    > {The exact text that will be posted as a PR comment, word for word}
@@ -183,6 +194,10 @@ After all comments have been presented (whether posted, skipped, or edited), pro
 - "Review complete for PR #{id}."
 - "{postedCount} comments posted, {skippedCount} skipped, {replyCount} posted as replies to existing threads."
 - Link: https://dev.azure.com/YourOrg/YourProject/_git/pied-piper-api/pullrequest/{id}
+
+If any Critical Issues or Suggestions were identified, tell the user:
+
+> To implement the suggested fixes on the PR source branch, click **Address Findings** below. The PR Fix agent will ask you which findings to address before making any changes.
 
 ## Important Rules
 

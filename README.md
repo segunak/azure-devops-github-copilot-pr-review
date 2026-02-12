@@ -1,4 +1,4 @@
-# GitHub Copilot PR Review Agent for Azure DevOps
+# Azure DevOps GitHub Copilot Pull Request Review
 
 > **This project is a workaround.** GitHub Copilot already has a built-in [Code Review Agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) that reviews pull requests automatically, but it only works with GitHub-hosted repositories. Microsoft will likely extend that capability to Azure DevOps Git repos at some point. Until they do, this project fills the gap. **If your repo is on GitHub, skip all of this and use the built-in Code Review Agent instead.**
 
@@ -21,11 +21,12 @@ There is a [prompt file](https://code.visualstudio.com/docs/copilot/customizatio
 4. Review the generated files, especially `.github/instructions/code-review.instructions.md` (the AI's best guess at your team's standards - edit as needed).
 5. Commit and push. Then follow the [**Starting the MCP Server**](#starting-the-mcp-server) steps below before using the agent.
 
-This generates five files (or merges into them if they already exist):
+This generates six files (or merges into them if they already exist):
 
 | File | Purpose |
 |------|---------|
 | `.github/agents/pr-review.agent.md` | Custom agent |
+| `.github/agents/pr-fix.agent.md` | Companion agent for implementing fixes (hidden from dropdown) |
 | `.github/instructions/code-review.instructions.md` | Review standards, generated from your codebase |
 | `.github/prompts/pr-review.prompt.md` | `/prReview` slash command |
 | `.vscode/mcp.json` | Azure DevOps MCP server configuration |
@@ -58,6 +59,8 @@ If you prefer to set things up by hand, see the [`example/`](example/) folder fo
 4. **Write your review standards** in `.github/instructions/code-review.instructions.md`. Add more files to `.github/instructions/` as needed - the agent reads every file in that folder.
 5. **Commit and push.**
 
+The `pr-fix.agent.md` file works out of the box - the only team-specific value is the default branch name in its Team Configuration comment.
+
 ---
 
 ## How It Works
@@ -71,6 +74,7 @@ The agent follows a 7-phase workflow:
 5. **Chat Summary** - Structured report grouped by severity
 6. **Post Comments** - One-at-a-time approval flow, duplicate-aware posting
 7. **Post-Review Summary** - Final tally with PR link
+8. **Address Findings (optional)** - Handoff to the PR Fix agent to implement fixes on the source branch
 
 The agent never auto-posts. Every comment is shown with exact text and the engineer approves, skips, or edits each one individually.
 
@@ -78,7 +82,11 @@ The agent never auto-posts. Every comment is shown with exact text and the engin
 
 ### Custom Agent (`.github/agents/pr-review.agent.md`)
 
-A [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) is a Markdown file with YAML frontmatter that defines a persona, tools, and workflow for GitHub Copilot. The `tools` frontmatter gives it access to Azure DevOps MCP tools (`ado/*`), terminal execution (`execute`), file reading (`read`), code search (`search`), web fetching (`web`), agent delegation (`agent`), VS Code features (`vscode`), and task tracking (`todo`).
+A [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) is a Markdown file with YAML frontmatter that defines a persona, tools, and workflow for GitHub Copilot. The `tools` frontmatter gives it access to Azure DevOps MCP tools (`ado/*`), terminal execution (`execute`), file reading (`read`), code search (`search`), web fetching (`web`), agent delegation (`agent`), VS Code features (`vscode`), and task tracking (`todo`). The `handoffs` frontmatter defines an "Address Findings" button that appears after a review, handing off to the PR Fix agent.
+
+### PR Fix Agent (`.github/agents/pr-fix.agent.md`)
+
+A companion agent activated via [handoff](https://code.visualstudio.com/docs/copilot/customization/custom-agents#_handoffs) from the PR Review agent. Hidden from the agents dropdown (`user-invokable: false`). After a review, clicking "Address Findings" switches to this agent, which inherits the full conversation history. It checks out the PR source branch, verifies the working tree is clean, and implements the reviewed fixes one at a time. It never auto-commits or auto-pushes.
 
 ### Instruction Files (`.github/instructions/`)
 
@@ -164,6 +172,7 @@ create-pr-review-agent.prompt.md    # The scaffolding prompt (copy to your repo)
 example/                            # Complete working reference (Node.js/TypeScript)
   .github/
     agents/pr-review.agent.md       # Example custom agent
+    agents/pr-fix.agent.md          # Example fix agent (handoff companion)
     instructions/                   # Example review standards
       code-review.instructions.md
     prompts/pr-review.prompt.md     # Example slash command

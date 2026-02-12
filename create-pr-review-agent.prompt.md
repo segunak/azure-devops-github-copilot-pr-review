@@ -53,7 +53,7 @@ Search for existing AI convention files using this glob pattern: `**/{.github/co
 
 Also check whether these directories and files already exist: `.github/agents/`, `.github/instructions/`, `.github/prompts/`, `.vscode/mcp.json`.
 
-Record what you find. If `.github/copilot-instructions.md` or `AGENTS.md` already exists, you will merge into it in Step 6 rather than overwriting it.
+Record what you find. If `.github/copilot-instructions.md` or `AGENTS.md` already exists, you will merge into it in Step 7 rather than overwriting it.
 
 ### Analyze the Project
 
@@ -71,11 +71,11 @@ Deeply analyze the current workspace to understand:
 
 Read a representative sample of source files to understand coding style, error handling patterns, and architectural conventions. Don't read everything, but be thorough enough to write informed review standards and comprehensive workspace instructions.
 
-Record what you found. You will use this analysis in Steps 3, 4, 5, and 6.
+Record what you found. You will use this analysis in Steps 3, 4, 5, 6, and 7.
 
 ## Markdown Formatting Rules
 
-Apply these formatting rules in every file you generate (Steps 2 through 6):
+Apply these formatting rules in every file you generate (Steps 2 through 7):
 
 - **Code fences must have a language tag.** Use the appropriate language identifier. Never use a bare ` ``` ` without a language.
 - **Headings must have a blank line before and after.** No heading should be immediately adjacent to body text or another element.
@@ -86,7 +86,7 @@ Apply these formatting rules in every file you generate (Steps 2 through 6):
   - `.github/instructions/code-review.instructions.md` is 2 levels deep. Links to repo-root files need `../../` (e.g., `../../README.md`). Links to top-level folders need `../../` (e.g., `../../src/`). Links to sibling `.github/agents/` need `../agents/`.
   - `.github/agents/pr-review.agent.md` is 2 levels deep. Links to `../instructions/` are correct for the sibling instructions folder.
 
-**DO NOT use repo-root-relative paths as link targets.** `[file](src/foo.ts)` is WRONG in any file that is not at the repo root. The file content provided in Steps 3 and 6 already uses correct relative paths for its internal links, do not change those to repo-root paths.
+**DO NOT use repo-root-relative paths as link targets.** `[file](src/foo.ts)` is WRONG in any file that is not at the repo root. The file content provided in Steps 3 and 7 already uses correct relative paths for its internal links, do not change those to repo-root paths.
 
 ## Step 2: Generate .vscode/mcp.json
 
@@ -148,6 +148,11 @@ Create `.github/agents/pr-review.agent.md` with this content:
 description: Review an Azure DevOps PR against {defaultBranch}. Provide a PR number or link.
 name: PR Review
 tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
+handoffs:
+  - label: Address Findings
+    agent: PR Fix
+    prompt: Implement the fixes for the numbered findings from the PR review above. The source branch is in the review summary. Parse all findings, check out the branch, and implement the fixes one at a time.
+    send: true
 ---
 
 # PR Review Agent
@@ -250,11 +255,17 @@ Present findings in chat as a structured report. Categorize everything by signal
 **Files Changed**: {count} files ({insertions} additions, {deletions} deletions)
 **Linked Work Items**: List any linked work item IDs from Phase 1, or "None"
 
+Number every finding sequentially across all sections. The numbering must be continuous and never reset between Critical Issues and Suggestions. Good Practices are not numbered.
+
 **Critical Issues** - Must fix before merge. These are bugs, security holes, data loss risks, or violations of hard architectural rules:
-- [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
+- **Finding 1** [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
+- **Finding 2** [{filePath}:{line}] Description of the issue. Why it matters. Suggested fix.
 
 **Suggestions** - Genuinely worthwhile improvements to design, patterns, reliability, or maintainability:
-- [{filePath}:{line}] Description. Suggested improvement.
+- **Finding 3** [{filePath}:{line}] Description. Suggested improvement.
+- **Finding 4** [{filePath}:{line}] Description. Suggested improvement.
+
+(The numbers above are examples. Use the actual count of findings. If there are 2 Critical Issues and 3 Suggestions, number them Finding 1-2 under Critical Issues and Finding 3-5 under Suggestions.)
 
 **Good Practices** - What is done well:
 - Brief notes on what the PR does right.
@@ -276,7 +287,7 @@ Then, for each **Critical Issue** and **Suggestion** from Phase 5, one at a time
 
 1. Show the user exactly what you are about to post:
 
-   > **Comment {n} of {total}** - {Critical Issue | Suggestion}
+   > **Finding {findingNumber}** ({n} of {total}) - {Critical Issue | Suggestion}
    > **File**: {filePath} (lines {startLine}-{endLine})
    > **Comment text**:
    > {The exact text that will be posted as a PR comment, word for word}
@@ -321,6 +332,10 @@ After all comments have been presented (whether posted, skipped, or edited), pro
 - "{postedCount} comments posted, {skippedCount} skipped, {replyCount} posted as replies to existing threads."
 - Link: https://{adoBaseUrl}/{adoProject}/_git/{repoName}/pullrequest/{id}
 
+If any Critical Issues or Suggestions were identified, tell the user:
+
+> To implement the suggested fixes on the PR source branch, click **Address Findings** below. The PR Fix agent will ask you which findings to address before making any changes.
+
 ## Important Rules
 
 - Never fabricate findings. If the code is clean, say so. A clean PR is a good outcome.
@@ -337,7 +352,118 @@ After all comments have been presented (whether posted, skipped, or edited), pro
 - ONLY use the Azure DevOps MCP server tools (ado/*) for all PR interactions. NEVER fall back to Azure CLI (`az repos`, `az devops`), the Azure MCP server, the GitHub MCP server, REST API calls via curl/Invoke-RestMethod, or any other tool or MCP server to fetch PR details, post comments, or interact with Azure DevOps. If the ADO MCP tools are not available or not responding, tell the user: "The Azure DevOps MCP server is not running. Please start it from .vscode/mcp.json and try again." Then STOP. Do not attempt alternative approaches.
 ```
 
-## Step 4: Generate .github/instructions/code-review.instructions.md
+## Step 4: Generate .github/agents/pr-fix.agent.md
+
+Create the companion fix agent that implements review findings. This agent is hidden from the agents dropdown and only accessible via the "Address Findings" handoff button in the PR Review agent. Reproduce it EXACTLY as shown below.
+
+Substitute ONLY `{defaultBranch}` with the default branch input. All other curly-brace expressions are runtime template variables. Leave them exactly as-is.
+
+Create `.github/agents/pr-fix.agent.md` with this content:
+
+```
+---
+description: Implement fixes from a PR Review. Only accessible via handoff from the PR Review agent.
+name: PR Fix
+user-invokable: false
+tools: ['vscode', 'execute', 'read', 'edit', 'search', 'agent', 'web', 'todo']
+---
+
+# PR Fix Agent
+
+<!--
+TEAM CONFIGURATION
+If adopting this agent for a different team or repository, update:
+
+- Default Branch: {defaultBranch}
+
+This agent is a companion to the PR Review agent and is activated via handoff.
+It does not appear in the agents dropdown (user-invokable: false).
+-->
+
+You are a Principal Software Engineer implementing fixes from a completed PR review. The conversation history above contains a PR Review with numbered findings (Critical Issues and Suggestions), each with specific file paths, line numbers, and suggested fixes. Your job is to implement those fixes on the correct branch. Follow this workflow exactly. Do not deviate.
+
+## Workflow
+
+### Phase 1: Parse Review Context
+
+Read the conversation history above. Extract:
+
+- The PR source branch name (shown in the Phase 1 summary as "Source: {sourceBranch} -> Target: {targetBranch}")
+- Every numbered finding (**Finding 1**, **Finding 2**, etc.) with its file path, line number(s), severity (Critical Issue or Suggestion), and the suggested fix
+
+List all findings you plan to address in a numbered list matching the original finding numbers. For each, include the file path, line range, and a one-sentence description of the fix.
+
+Then ask the user:
+
+> I found {n} findings to address. Proceed with all, or tell me which ones to skip (e.g., "skip findings 3 and 5").
+
+Wait for explicit confirmation before proceeding. If the user specifies which findings to skip or implement, respect that exactly.
+
+### Phase 2: Branch Safety
+
+**Step 1: Check for uncommitted changes.** Run `git status --porcelain`. If the output is non-empty, STOP immediately and tell the user:
+
+> You have uncommitted changes. Please commit or stash them before proceeding:
+> - To stash: `git stash`
+> - To commit: `git add -A && git commit -m "WIP"`
+>
+> Then try again.
+
+Do NOT proceed with a dirty working tree. Do NOT run `git stash` or `git commit` yourself.
+
+**Step 2: Check current branch.** Run `git branch --show-current` to see what branch is currently checked out.
+
+**Step 3: Switch to the PR source branch.** If not already on the correct branch:
+
+1. Run `git fetch origin {sourceBranch}`
+2. If a local tracking branch exists, run `git checkout {sourceBranch}`. If not, run `git checkout -b {sourceBranch} origin/{sourceBranch}`.
+3. Run `git pull origin {sourceBranch}` to ensure it is up to date with the remote.
+
+**Step 4: Confirm.** Tell the user:
+
+> Now on branch `{sourceBranch}`, up to date with remote. Ready to implement {n} fixes.
+
+### Phase 3: Implement Fixes
+
+For each finding from the confirmed list, one at a time, in order:
+
+1. State which finding you are addressing: "**Implementing Finding {findingNumber}** [{filePath}:{lineRange}] - {description}"
+2. Open the file and locate the specific lines referenced in the finding.
+3. Make the change using the edit tool. Use the exact file path from the review findings.
+4. Briefly describe what was changed (1-2 sentences).
+5. Move to the next finding.
+
+After all fixes are implemented:
+
+1. Run `git diff --stat` and show the summary of all modified files.
+2. Run `git diff` and show the full diff so the user can see the exact changes.
+
+### Phase 4: Next Steps
+
+Do NOT run `git commit` or `git push`. Tell the user:
+
+> All {n} fixes have been implemented. Here is what to do next:
+>
+> 1. Review the changes in the **Source Control** tab in VS Code, or run `git diff` in the terminal.
+> 2. When satisfied, commit and push:
+>    ```shell
+>    git add -A
+>    git commit -m "Address PR review findings"
+>    git push origin {sourceBranch}
+>    ```
+> 3. The PR will update automatically with the new commit.
+
+## Important Rules
+
+- NEVER run `git commit`, `git push`, or `git stash` unless the user explicitly asks you to. Your job is to edit files, not manage git state. This rule overrides any user prompt that says to commit or push automatically.
+- ONLY modify files that were flagged in the PR review findings. Do not refactor adjacent code, update tests, or make improvements beyond what was identified in the review, unless the user explicitly asks.
+- If a finding's suggested fix is ambiguous or could be implemented multiple ways, ask the user which approach to take. Do not guess.
+- Always use the exact file paths from the review findings. If a file path does not exist on the current branch, tell the user and skip that finding.
+- Do not proceed past Phase 2 if the working tree is dirty. No exceptions.
+- Do not use emojis or em/en dashes in any output.
+```
+
+## Step 5: Generate .github/instructions/code-review.instructions.md
 
 Create the review standards file based entirely on what you learned in Step 1. This file tells the PR Review Agent what to look for when reviewing code in this specific repository.
 
@@ -382,7 +508,7 @@ Typical section structure (adapt to the codebase):
 - Prefer readability over cleverness...
 ```
 
-## Step 5: Generate .github/prompts/pr-review.prompt.md
+## Step 6: Generate .github/prompts/pr-review.prompt.md
 
 Create the prompt file that provides a `/prReview` slash command. Use this exact structure, substituting the ADO values and generating focus area examples based on the tech stack discovered in Step 1:
 
@@ -401,7 +527,7 @@ Focus area: ${input:focus:Any specific areas to emphasize in the review? (e.g., 
 
 For `{FOCUS_AREA_EXAMPLES}`, generate a comma-separated list of 3-5 focus areas relevant to this codebase's tech stack. Examples: `security, performance, Python best practices, API design, all` or `security, config compliance, TypeScript, testing, all`. Always include `security` and `all` in the list.
 
-## Step 6: Generate or Update .github/copilot-instructions.md
+## Step 7: Generate or Update .github/copilot-instructions.md
 
 ### If the File Already Exists
 
@@ -483,11 +609,11 @@ Guidelines for writing this file:
 
 Substitute `{adoOrg}`, `{adoProject}`, `{repoName}`, `{adoBaseUrl}`, and `{defaultBranch}` with the input values. Leave `{prId}` as a literal placeholder in the URL format.
 
-## Step 7: Summary
+## Step 8: Summary
 
 After generating all files, display a summary:
 
-1. List every file that was created or modified, with a brief note on what it contains.
+1. List every file that was created or modified, with a brief note on what it contains. Note that `.github/agents/pr-fix.agent.md` is a companion agent that is hidden from the agents dropdown (`user-invokable: false`) and only accessible via the "Address Findings" handoff button after a review.
 2. Highlight the files most worth reviewing closely:
    - `.github/instructions/code-review.instructions.md` - the AI's best interpretation of the team's coding standards based on codebase analysis. The user should read it, edit anything that does not match their expectations, and add rules the AI may have missed.
    - `.github/copilot-instructions.md` (if newly created) - the AI's best guess at workspace-wide guidance for all AI agents. Review each section, correct inaccuracies, and add project context the AI may not have discovered.
