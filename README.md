@@ -42,7 +42,7 @@ If the server still does not start or the agent cannot find ADO tools, see the [
 
 ## Using the Agent
 
-**Option A**: In GitHub Copilot chat, click the agent dropdown (or type `@`), select "PR Review", type a PR number or paste a PR link.
+**Option A**: In GitHub Copilot chat, click the agent dropdown and select "PR Review", type a PR number or paste a PR link.
 
 **Option B**: Type `/prReview` in the chat panel. It asks for the PR number and an optional focus area.
 
