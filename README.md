@@ -1,6 +1,6 @@
 # Azure DevOps GitHub Copilot Pull Request Review
 
-> **This project is a workaround.** GitHub Copilot already has a built-in [Code Review Agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) that reviews pull requests automatically, but it only works with GitHub-hosted repositories. Microsoft will likely extend that capability to Azure DevOps Git repos at some point. Until they do, this project fills the gap. **If your repo is on GitHub, skip all of this and use the built-in Code Review Agent instead.**
+> **This project fills a gap.** GitHub Copilot's built-in [Code Review Agent](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review) only works with GitHub-hosted repositories. If your repo is on [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/user-guide/what-is-azure-devops?view=azure-devops), you can't use it. This project bridges that gap by wiring together three things Microsoft already built: [GitHub Copilot](https://docs.github.com/en/copilot/get-started/what-is-github-copilot), [GitHub Copilot Custom Agents in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-agents), and the [Azure DevOps MCP Server](https://github.com/microsoft/azure-devops-mcp). All three are Microsoft products that just don't integrate with each other natively yet. The entire setup is a Markdown file that reads your codebase and generates ready-to-go agents (more markdown files). No code, no infrastructure, no dependencies beyond what you already have. **If your repo is on GitHub, skip all of this and use the built-in Code Review Agent instead.**
 
 A GitHub Copilot [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) that reviews Azure DevOps PRs from inside VS Code. Posts inline comments with individual approval, enforces your team's coding standards, and optionally implements the suggested fixes on the PR branch.
 
@@ -97,85 +97,26 @@ The `pr-fix.agent.md` file works out of the box - the only team-specific value i
 
 ---
 
-## How It Works
+## What's in the Box
 
-The agent follows a 7-phase workflow:
+The setup is six files. Each one maps to a VS Code or GitHub Copilot feature:
 
-1. **Identify the PR** - Fetch metadata from ADO, display summary
-2. **Get the Diff** - Remote-only diffs via git (never local branch)
-3. **Gather Broader Context** - Explore the repo on the default branch to understand patterns
-4. **Review Against Standards** - Analyze every changed file against instruction files and best practices
-5. **Chat Summary** - Structured report grouped by severity
-6. **Post Comments** - One-at-a-time approval flow, duplicate-aware posting
-7. **Post-Review Summary** - Final tally with PR link
-8. **Address Findings (optional)** - Handoff to the PR Fix agent to implement fixes on the source branch
+| File | What It Is | Docs |
+|------|-----------|------|
+| `.github/agents/pr-review.agent.md` | The main agent. Reviews PRs using the MCP server, git diffs, and your instruction files. | [Custom Agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) |
+| `.github/agents/pr-fix.agent.md` | Optional companion. After a review, checks out the PR branch and implements the suggested fixes. Hidden from the dropdown. | [Handoffs](https://code.visualstudio.com/docs/copilot/customization/custom-agents#_handoffs) |
+| `.github/instructions/` | Your team's coding standards and review rules. The agent reads every file in this folder. | [Custom Instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) |
+| `.github/prompts/pr-review.prompt.md` | Adds a `/prReview` slash command to Copilot chat. Optional. | [Prompt Files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) |
+| `.vscode/mcp.json` | Connects GitHub Copilot to Azure DevOps so the agent can read PRs and post comments. | [MCP Servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers) |
+| `.github/copilot-instructions.md` | General context about the repo that all Copilot interactions (not just PR reviews) can use. | [Global Instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions#_use-a-githubcopilotinstructionsmd-file) |
 
-The agent never auto-posts. Every comment is shown with exact text and the engineer approves, skips, or edits each one individually.
-
-## What Gets Generated
-
-### Custom Agent (`.github/agents/pr-review.agent.md`)
-
-A [custom agent](https://code.visualstudio.com/docs/copilot/customization/custom-agents) is a Markdown file with YAML frontmatter that defines a persona, tools, and workflow for GitHub Copilot. The `tools` frontmatter gives it access to Azure DevOps MCP tools (`ado/*`), terminal execution (`execute`), file reading (`read`), code search (`search`), web fetching (`web`), agent delegation (`agent`), VS Code features (`vscode`), and task tracking (`todo`). The `handoffs` frontmatter defines an "Address Findings" button that appears after a review, handing off to the PR Fix agent.
-
-### PR Fix Agent (`.github/agents/pr-fix.agent.md`)
-
-A companion agent activated via [handoff](https://code.visualstudio.com/docs/copilot/customization/custom-agents#_handoffs) from the PR Review agent. Hidden from the agents dropdown (`user-invokable: false`). After a review, clicking "Address Findings" switches to this agent, which inherits the full conversation history. It checks out the PR source branch, verifies the working tree is clean, and implements the reviewed fixes one at a time. It never auto-commits or auto-pushes.
-
-### Instruction Files (`.github/instructions/`)
-
-[Custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) define review criteria as Markdown files. The agent reads all files in `.github/instructions/`. You can have one file or many.
-
-### Prompt File (`.github/prompts/pr-review.prompt.md`)
-
-A [prompt file](https://code.visualstudio.com/docs/copilot/customization/prompt-files) that provides the `/prReview` slash command. Optional - most engineers use the agent dropdown directly.
-
-### MCP Server Configuration (`.vscode/mcp.json`)
-
-Configures the [Azure DevOps MCP Server](https://github.com/microsoft/azure-devops-mcp) via the [Model Context Protocol](https://modelcontextprotocol.io/), giving the agent access to ADO tools for fetching PR details, reading threads, and posting inline comments.
-
-### Global GitHub Copilot Instructions (`.github/copilot-instructions.md`)
-
-The workspace-level [copilot-instructions.md](https://code.visualstudio.com/docs/copilot/customization/instructions) gives GitHub Copilot general context about the repo, the ADO integration, and the PR Review Agent.
-
-## Design Principles
-
-- **No noise.** Does not flag cosmetic issues, minor style preferences, or trivial formatting. Noise destroys trust.
-- **No fabrication.** If the code is clean, the agent says so. Never invents findings to justify the review.
-- **Bug hunting.** Actively looks for bugs, logical errors, off-by-one mistakes, race conditions, null/empty guards, and cross-file breakage.
-- **Remote-only diffs.** All diffs come from remote refs. The user's local branch is never used.
-- **Broader context awareness.** Explores the repo on the default branch to understand surrounding patterns before reviewing.
-- **Individual comment approval.** Every comment requires explicit approval before posting. No bulk approvals.
-- **Duplicate-aware posting.** Replies to existing threads instead of creating duplicates on re-runs.
+See the [`example/`](example/) folder for a complete working reference.
 
 ## Customization
 
-### Adding Review Standards
-
-Create additional instruction files in `.github/instructions/`. The agent reads every file in that folder. For example:
-
-- `pipeline-yaml.instructions.md` - Rules for Azure Pipelines YAML
-- `database.instructions.md` - SQL and migration standards
-- `infrastructure.instructions.md` - Bicep or ARM template rules
-
-### Changing Phase 4 Categories
-
-Edit the review categories in Phase 4 of the agent file to match your stack. These are suggestions the agent adapts per-PR, not a fixed checklist.
-
-### Using a Specific Model
-
-Add a `model` field to the agent's YAML frontmatter:
-
-```yaml
----
-description: Review an Azure DevOps PR against main. Provide a PR number or link.
-name: PR Review
-tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'ado/*', 'todo']
-model: ['Claude Opus 4.6']
----
-```
-
-The scaffolding prompt does not set a model by default, so it uses whatever model you have selected in VS Code.
+- **Add review standards.** Create more instruction files in `.github/instructions/`. The agent reads every file in that folder automatically.
+- **Change review categories.** Edit Phase 4 in the agent file to match your tech stack.
+- **Pin a model.** Add `model: ['Claude Opus 4.6']` or similar to the agent's YAML frontmatter. The scaffolding prompt does not set a model by default.
 
 ## Limitations
 
