@@ -136,6 +136,10 @@ GitHub's [built-in Code Review Agent](https://docs.github.com/en/copilot/how-tos
 
 Extensions like [ado-copilot-code-review](https://github.com/little-fort/ado-copilot-code-review) run as pipeline tasks using the GitHub Copilot CLI. Trade-offs: require a PAT, post only general comments (not inline), no human-in-the-loop, no codebase context awareness.
 
+### GitHub Copilot CLI
+
+The [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli#review-code-changes) has a [`/review`](https://docs.github.com/en/copilot/reference/cli-command-reference) command that reviews code changes from the terminal. It compares whatever branch you're checked out to against its upstream (e.g., `main`) and gives feedback in the terminal. It works with any git repo, including Azure DevOps. However, it has no knowledge of Azure DevOps PRs, can't post inline comments on a PR, can't fetch linked work items, and can't implement fixes. If all you need is a quick local review without the ADO integration, it's a solid lightweight option.
+
 ### Community Discussion
 
 There is a [community discussion](https://github.com/orgs/community/discussions/151205) requesting native GitHub Copilot support for Azure DevOps PR reviews.
